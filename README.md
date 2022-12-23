@@ -33,7 +33,7 @@ a lua/roblox function made to filter and deep search values inside a table with 
 
 
                 table -> 
-                    tablematch = {index = <table index> or <validator>, value = <table value> or <validator>}
+                    tablematch = {index = <table index>, value = <table value>, validator = <validator>}
                     tablesize = <size of table>
                     metatable = <exact metatable of table>
                     hasmetatable = <bool>
