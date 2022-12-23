@@ -384,8 +384,6 @@ do
             end
             ]]
 
-            ft.results = {}
-
             for i,v in next, latestResults do
                 if luaType(v) == filterOptions.type and (not checkClassName or v.ClassName == filterOptions.classname) and ((not validator and (checkIndex and ft:checkIndex(i) or not checkIndex) and (not checkProperty or self:checkProperty(v)) and self:checkValue(v)) or validator and filterOptions.validator(i,v)) then
                     table.insert(ft.results, v)
