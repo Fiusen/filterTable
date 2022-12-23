@@ -68,8 +68,7 @@ local filterTable;
 
 
                 table -> 
-                    index = <table index> or <filterOptions> or <validator>
-                    value = <table value> or <filterOptions> or <validator>
+                    tablematch = {index = <table index> or <validator>, value = <table value> or <validator>}
                     tablesize = <size of table>
                     metatable = <exact metatable of table>
                     hasmetatable = <bool>
@@ -240,10 +239,15 @@ do
                 local checkTableSize = checkExists(filterOptions.tablesize) and checkType(filterOptions.tablesize, "number", "invalid argument to filterOptions.tablesize 'number' expected got %s");
                 local checkMetatable = checkExists(filterOptions.metatable) and checkType(filterOptions.metatable, "table", "invalid argument to filterOptions.metatable 'table' expected got %s");
                 local checkHasMetatable = checkExists(filterOptions.hasmetatable) and checkType(filterOptions.hasmetatable, "boolean", "invalid argument to filterOptions.hasmetatable 'boolean' expected got %s")
+                local checkTableMatch = checkExists(filterOptions.tablematch) and checkType(filterOptions.tablematch, "table", "invalid argument to filterOptions.tablematch 'table' expected got %s")
+                local checkTableMatchIndex = checkTableMatch and checkExists(filterOptions.tablematch.index)
+                local checkTableMatchValue = checkTableMatch and checkExists(filterOptions.tablematch.value)
 
                 function ft:checkValue(value)
 
                     if checkValue and value ~= filterOptions.value then return end
+
+                    if checkTableMatch and (not checkTableMatchIndex or rawget(value, filterOptions.tablematch.index)) ~= (not checkTableMatchValue or filterOptions.tablematch.value) then return end
 
                     if checkTableSize and #self.parent ~= filterOptions.tablesize then return end
 
@@ -383,6 +387,8 @@ do
                 end
             end
             ]]
+
+            ft.results = {}
 
             for i,v in next, latestResults do
                 if luaType(v) == filterOptions.type and (not checkClassName or v.ClassName == filterOptions.classname) and ((not validator and (checkIndex and ft:checkIndex(i) or not checkIndex) and (not checkProperty or self:checkProperty(v)) and self:checkValue(v)) or validator and filterOptions.validator(i,v)) then
