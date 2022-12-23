@@ -9,6 +9,16 @@ local function areValuesInTable(original, toCheck)
     return true;
 end
 
+local function GetChildrenOfClass(obj, className)
+    local children = {}
+    for i, v in pairs(obj:GetChildren()) do
+        if v.ClassName == className then
+            table.insert(children, v)
+        end
+    end
+    return children;
+end
+
 local function checkType(value, type, err)
     err = err or ""
     local typ = luaType(value)
