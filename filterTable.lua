@@ -9,26 +9,6 @@ local function areValuesInTable(original, toCheck)
     return true;
 end
 
-local function doConstantsMatch(func, tableOfConstants)
-    local constants = getconstants(func)
-    for i, v in pairs(tableOfConstants) do
-        if not table.find(constants, v) then
-            return false
-        end
-    end
-    return true;
-end
-
-local function GetChildrenOfClass(obj, className)
-    local children = {}
-    for i, v in pairs(obj:GetChildren()) do
-        if v.ClassName == className then
-            table.insert(children, v)
-        end
-    end
-    return children;
-end
-
 local function checkType(value, type, err)
     err = err or ""
     local typ = luaType(value)
@@ -420,16 +400,4 @@ do
 
 end
 
-local o = os.clock()
-
-local tbl = {"testing", {"testing"}}
-
-print("fitler table", tbl, tbl[2])
-
-local results = filterTable(tbl, {type = "string", value = "testing", logpath = true})
-
-for i,v in pairs(results) do
-   table.foreach(v,print)
-end
-
-print("took", os.clock()-o)
+return filterTable
