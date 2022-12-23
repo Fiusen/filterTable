@@ -247,7 +247,7 @@ do
 
                     if checkValue and value ~= filterOptions.value then return end
 
-                    if checkTableMatch and (checkTableMatchIndex and checkTableMatchValue and rawget(value, filterOptions.tablematch.index) == filterOptions.tablematch.value) or (not checkTableMatchIndex and checkTableMatchValue and table.find(value, filterOptions.tablematch.value)) or (checkTableMatchIndex and not checkTableMatchValue and checkExists(rawget(value, filterOptions.tablematch.index))) then return end
+                    if checkTableMatch and not ((checkTableMatchIndex and checkTableMatchValue and rawget(value, filterOptions.tablematch.index) == filterOptions.tablematch.value) or (not checkTableMatchIndex and checkTableMatchValue and table.find(value, filterOptions.tablematch.value)) or (checkTableMatchIndex and not checkTableMatchValue and checkExists(rawget(value, filterOptions.tablematch.index)))) then return end
 
                     if checkTableSize and #self.parent ~= filterOptions.tablesize then return end
 
