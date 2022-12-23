@@ -68,7 +68,7 @@ local filterTable;
 
 
                 table -> 
-                    tablematch = {index = <table index> or <validator>, value = <table value> or <validator>}
+                    tablematch = {index = <table index>, value = <table value>, validator = (optional) <validator>}
                     tablesize = <size of table>
                     metatable = <exact metatable of table>
                     hasmetatable = <bool>
@@ -239,15 +239,16 @@ do
                 local checkTableSize = checkExists(filterOptions.tablesize) and checkType(filterOptions.tablesize, "number", "invalid argument to filterOptions.tablesize 'number' expected got %s");
                 local checkMetatable = checkExists(filterOptions.metatable) and checkType(filterOptions.metatable, "table", "invalid argument to filterOptions.metatable 'table' expected got %s");
                 local checkHasMetatable = checkExists(filterOptions.hasmetatable) and checkType(filterOptions.hasmetatable, "boolean", "invalid argument to filterOptions.hasmetatable 'boolean' expected got %s")
-                local checkTableMatch = checkExists(filterOptions.tablematch) and checkType(filterOptions.tablematch, "table", "invalid argument to filterOptions.tablematch 'table' expected got %s")
+                
+                
+                local checkTableMatch = checkExists(filterOptions.tablematch) 
                 local checkTableMatchIndex = checkTableMatch and checkExists(filterOptions.tablematch.index)
                 local checkTableMatchValue = checkTableMatch and checkExists(filterOptions.tablematch.value)
+                local checkTableMatchValidator = checkTableMatch and checkExists(filterOptions.tablematch.validator) and checkType(filterOptions.tablematch.validator, "function", "invalid argument to filterOptions.tablematch.validator 'function' expected got %s")
 
                 function ft:checkValue(value)
 
                     if checkValue and value ~= filterOptions.value then return end
-
-                    if checkTableMatch and not ((checkTableMatchIndex and checkTableMatchValue and rawget(value, filterOptions.tablematch.index) == filterOptions.tablematch.value) or (not checkTableMatchIndex and checkTableMatchValue and table.find(value, filterOptions.tablematch.value)) or (checkTableMatchIndex and not checkTableMatchValue and checkExists(rawget(value, filterOptions.tablematch.index)))) then return end
 
                     if checkTableSize and #self.parent ~= filterOptions.tablesize then return end
 
@@ -256,7 +257,19 @@ do
                     if checkMetatable and metatable ~= filterOptions.metatable then return end
                     if checkHasMetatable and metatable ~= filterOptions.hasmetatable then return end
 
-                    return true
+                    if checkTableMatch then
+
+                        if checkTableMatchIndex and checkTableMatchValue and rawget(value, filterOptions.tablematch.index) == filterOptions.tablematch.value then
+                            return not checkTableMatchValidator or filterOptions.tablematch.validator(filterOptions.tablematch.index, rawget(value, filterOptions.tablematch.index))
+                        elseif not checkTableMatchIndex and checkTableMatchValue and table.find(value, filterOptions.tablematch.value) then
+                            return not checkTableMatchValidator or filterOptions.tablematch.validator(table.find(value, filterOptions.tablematch.value), filterOptions.tablematch.value)
+                        elseif checkTableMatchIndex and not checkTableMatchValue and checkExists(rawget(value, filterOptions.tablematch.index)) then
+                            return not checkTableMatchValidator or filterOptions.tablematch.validator(filterOptions.tablematch.index, rawget(value, filterOptions.tablematch.index))
+                        end
+
+                        return false;
+                        
+                    end
                 end
 
                 function ft:writeMatch(index, value, path)
