@@ -1,6 +1,6 @@
 # filterTable
 
-a lua/roblox function made to ***filter and deep search values inside a table*** with better acurracy
+a lua/roblox function made to ***filter and deep search values inside a table*** with better acurracy and speed, including a way to "next scan" from older results
 
 **documentation:**
 ```rs
