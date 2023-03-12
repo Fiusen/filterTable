@@ -20,7 +20,7 @@ local function GetChildrenOfClass(obj, className)
 end
 
 local function checkType(value, type, descr)
-    err = "invalid argument to '"..descr.."' '"..type.."' expected got %s" or ""
+    err = "invalid argument to '"..descr.."' '"..type.."' expected got '%s'" or ""
     local typ = luaType(value)
     assert(typ == type, err:format(typ))
     return true;
@@ -32,7 +32,7 @@ end
 
 local function checkIfType(value, type, descr)
     if not value then return end;
-    err = "invalid argument to '"..descr.."' '"..type.."' expected got %s" or ""
+    err = "invalid argument to '"..descr.."' '"..type.."' expected got '%s'" or ""
     local typ = luaType(value)
     assert(typ == type, err:format(typ))
     return true;
@@ -192,8 +192,8 @@ do
 
         local function loadTypes()
 
-            -- this code looks way too big because its detecting which settings types you are using before actually checking values inside a table
-            -- this is done to avoid performance issues when checking really big tables
+            -- this is where the actual checking of the values will happen, this function is for pre-loading settings and type checking them before the code actually runs and starts checking the values
+            -- this huge amount of variables is created to avoid doing to many CALL's while table is being checked, so we "inline" all the settings beforehand to increase performance
 
             if filterOptions.type == "function" then
 
@@ -437,7 +437,5 @@ do
     end
 
 end
-
-getgenv().filterTable = filterTable;
 
 return filterTable
