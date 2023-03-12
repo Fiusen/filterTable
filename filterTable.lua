@@ -19,8 +19,8 @@ local function GetChildrenOfClass(obj, className)
     return children;
 end
 
-local function checkType(value, type, err)
-    err = err or ""
+local function checkType(value, type, descr)
+    err = "invalid argument to '"..descr.."' '"..type.."' expected got %s" or ""
     local typ = luaType(value)
     assert(typ == type, err:format(typ))
     return true;
@@ -28,6 +28,14 @@ end
 
 local function checkExists(value)
     return value ~= nil;
+end
+
+local function checkIfType(value, type, descr)
+    if not value then return end;
+    err = "invalid argument to '"..descr.."' '"..type.."' expected got %s" or ""
+    local typ = luaType(value)
+    assert(typ == type, err:format(typ))
+    return true;
 end
 
 local function getScript(f)
@@ -89,8 +97,8 @@ local filterTable;
         ]]
 do
     filterTable = function(target, filterOptions, nextScan)
-        checkType(target, "table", "invalid argument to #1 'table' expected got %s")
-        checkType(filterOptions, "table", "invalid argument to #2 'table' expected got %s")
+        checkType(target, "table", "#1")
+        checkType(filterOptions, "table", "#2")
 
         local placeholder = function(f) return {} end
         local pairs = pairs;
@@ -125,12 +133,12 @@ do
         local checkIndex = filterOptions.type == "table" and checkExists(filterOptions.index);
         local checkValue = checkExists(filterOptions.value);
 
-        local checkProperty = checkExists(filterOptions.property) and checkType(filterOptions.property, "string", "invalid argument to filterOptions.property 'string' expected got %s");
-        local checkClassName = checkExists(filterOptions.classname) and checkType(filterOptions.classname, "string", "invalid argument to filterOptions.classname 'string' expected got %s");
+        local checkProperty = checkIfType(filterOptions.property, "string", "filterOptions.property");
+        local checkClassName = checkIfType(filterOptions.classname, "string", "filterOptions.classname");
 
-        local deepSearch = checkExists(filterOptions.deepsearch) and checkType(filterOptions.deepsearch, "boolean", "invalid argument to filterOptions.deepsearch 'boolean' expected got %s");
-        local logPath = checkExists(filterOptions.logpath) and checkType(filterOptions.logpath, "boolean", "invalid argument to filterOptions.logpath 'boolean' expected got %s");
-        local validator = checkExists(filterOptions.validator) and checkType(filterOptions.validator, "function", "invalid argument to filterOptions.validator 'function' expected got %s");
+        local deepSearch = checkIfType(filterOptions.deepsearch, "boolean", "filterOptions.deepsearch");
+        local logPath = checkIfType(filterOptions.logpath, "boolean", "filterOptions.logpath");
+        local validator = checkIfType(filterOptions.validator, "function", "filterOptions.validator");
 
         ft.mainScan = target;
 
@@ -184,22 +192,25 @@ do
 
         local function loadTypes()
 
+            -- this code looks way too big because its detecting which settings types you are using before actually checking values inside a table
+            -- this is done to avoid performance issues when checking really big tables
+
             if filterOptions.type == "function" then
 
-                local checkName = checkExists(filterOptions.name) and checkType(filterOptions.name, "string", "invalid argument to filterOptions.name 'string' expected got %s");
-                local checkUpvalues = checkExists(filterOptions.upvalues) and checkType(filterOptions.upvalues, "table", "invalid argument to filterOptions.upvalues 'table' expected got %s");
-                local checkConstants = checkExists(filterOptions.constants) and checkType(filterOptions.constants, "table", "invalid argument to filterOptions.constants 'table' expected got %s")    
-                local checkProtos = checkExists(filterOptions.protos) and checkType(filterOptions.protos, "table", "invalid argument to filterOptions.protos 'table' expected got %s");
-                local checkMatchUpvalues = checkExists(filterOptions.matchupvalues) and checkType(filterOptions.matchupvalues, "table", "invalid argument to filterOptions.matchupvalues 'table' expected got %s")    
-                local checkMatchConstants = checkExists(filterOptions.matchconstants) and checkType(filterOptions.matchconstants, "table", "invalid argument to filterOptions.matchconstants 'table' expected got %s");
-                local checkMatchProtos = checkExists(filterOptions.matchprotos) and checkType(filterOptions.matchprotos, "table", "invalid argument to filterOptions.matchprotos 'table' expected got %s")    
-                local checkUpvalueAmount = checkExists(filterOptions.upvalueamount) and checkType(filterOptions.upvalueamount, "number", "invalid argument to filterOptions.upvalueamount 'number' expected got %s");
-                local checkConstantAmount = checkExists(filterOptions.constantamount) and checkType(filterOptions.constantamount, "number", "invalid argument to filterOptions.constantamount 'number' expected got %s")    
-                local checkProtoAmount = checkExists(filterOptions.protoamount) and checkType(filterOptions.protoamount, "number", "invalid argument to filterOptions.protoamount 'boolean' expected got %s")    
-                local checkInfo = checkExists(filterOptions.info) and checkType(filterOptions.info, "table", "invalid argument to filterOptions.info 'table' expected got %s")    
-                local checkMatchInfo = checkExists(filterOptions.matchinfo) and checkType(filterOptions.matchinfo, "table", "invalid argument to filterOptions.matchinfo 'table' expected got %s")    
-                local checkIgnoreEnv = checkExists(filterOptions.ignoreenv) and checkType(filterOptions.ignoreenv, "boolean", "invalid argument to filterOptions.ignoreenv 'boolean' expected got %s")    
-                local checkScript = checkExists(filterOptions.script) and checkType(filterOptions.script, "Instance", "invalid argument to filterOptions.script 'Instance' expected got %s")    
+                local checkName = checkIfType(filterOptions.name, "string", "filterOptions.name");
+                local checkUpvalues = checkIfType(filterOptions.upvalues, "table", "filterOptions.upvalues");
+                local checkConstants = checkIfType(filterOptions.constants, "table", "filterOptions.constants")    
+                local checkProtos = checkIfType(filterOptions.protos, "table", "filterOptions.protos");
+                local checkMatchUpvalues = checkIfType(filterOptions.matchupvalues, "table", "filterOptions.matchupvalues")    
+                local checkMatchConstants = checkIfType(filterOptions.matchconstants, "table", "filterOptions.matchconstants");
+                local checkMatchProtos = checkIfType(filterOptions.matchprotos, "table", "filterOptions.matchprotos")    
+                local checkUpvalueAmount = checkIfType(filterOptions.upvalueamount, "number", "filterOptions.upvalueamount");
+                local checkConstantAmount = checkIfType(filterOptions.constantamount, "number", "filterOptions.constantamount")    
+                local checkProtoAmount = checkIfType(filterOptions.protoamount, "number", "filterOptions.protoamount")    
+                local checkInfo = checkIfType(filterOptions.info, "table", "filterOptions.info")    
+                local checkMatchInfo = checkIfType(filterOptions.matchinfo, "table", "filterOptions.matchinfo")    
+                local checkIgnoreEnv = checkIfType(filterOptions.ignoreenv, "boolean", "filterOptions.ignoreenv")    
+                local checkScript = checkIfType(filterOptions.script, "Instance", "filterOptions.script")    
 
 
                 function ft:checkValue(value)
@@ -246,15 +257,15 @@ do
 
             elseif filterOptions.type == "table" then
 
-                local checkTableSize = checkExists(filterOptions.tablesize) and checkType(filterOptions.tablesize, "number", "invalid argument to filterOptions.tablesize 'number' expected got %s");
-                local checkMetatable = checkExists(filterOptions.metatable) and checkType(filterOptions.metatable, "table", "invalid argument to filterOptions.metatable 'table' expected got %s");
-                local checkHasMetatable = checkExists(filterOptions.hasmetatable) and checkType(filterOptions.hasmetatable, "boolean", "invalid argument to filterOptions.hasmetatable 'boolean' expected got %s")
+                local checkTableSize = checkIfType(filterOptions.tablesize, "number", "filterOptions.tablesize");
+                local checkMetatable = checkIfType(filterOptions.metatable, "table", "filterOptions.metatable");
+                local checkHasMetatable = checkIfType(filterOptions.hasmetatable, "boolean", "filterOptions.hasmetatable")
                 
                 
                 local checkTableMatch = checkExists(filterOptions.tablematch) 
                 local checkTableMatchIndex = checkTableMatch and checkExists(filterOptions.tablematch.index)
                 local checkTableMatchValue = checkTableMatch and checkExists(filterOptions.tablematch.value)
-                local checkTableMatchValidator = checkTableMatch and checkExists(filterOptions.tablematch.validator) and checkType(filterOptions.tablematch.validator, "function", "invalid argument to filterOptions.tablematch.validator 'function' expected got %s")
+                local checkTableMatchValidator = checkTableMatch and checkIfType(filterOptions.tablematch.validator, "function", "filterOptions.tablematch.validator")
 
                 function ft:checkValue(value)
 
@@ -295,8 +306,8 @@ do
 
             elseif filterOptions.type == "userdata" then
 
-                local checkMetatable = checkExists(filterOptions.metatable) and checkType(filterOptions.metatable, "table", "invalid argument to filterOptions.metatable 'table' expected got %s");
-                local checkHasMetatable = checkExists(filterOptions.hasmetatable) and checkType(filterOptions.hasmetatable, "boolean", "invalid argument to filterOptions.hasmetatable 'boolean' expected got %s")
+                local checkMetatable = checkIfType(filterOptions.metatable, "table", "filterOptions.metatable");
+                local checkHasMetatable = checkIfType(filterOptions.hasmetatable, "boolean", "filterOptions.hasmetatable")
 
                 function ft:checkValue(value)
 
@@ -426,5 +437,7 @@ do
     end
 
 end
+
+getgenv().filterTable = filterTable;
 
 return filterTable
