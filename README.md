@@ -1,6 +1,6 @@
 # filterTable
 
-a lua/roblox function made to ***filter and deep search values inside a table*** with better acurracy and speed, including a way to "next scan" from older results
+A Lua/Roblox function made to ***filter and deep search values inside a table*** with blazing fast speed and lots of options, including a way to "next scan" from older results, making filtering dynamic values way easier.
 
 **documentation:**
 ```rs
@@ -73,7 +73,7 @@ local results = filterTable(tbl, {type = "string", value = "testing", logpath = 
 
 tbl[1] = "not testing" -- change one of the values
 
-results = results.nextScan({type = "string", value = "testing", logpath = true}) -- will return 1 value
+results = results.nextScan({type = "string", value = "testing", logpath = true}) -- will return only 1 value (the unchanged one)
 
 for i,v in pairs(results) do
    table.foreach(v,print)
