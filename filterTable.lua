@@ -1,4 +1,12 @@
 local luaType = typeof and typeof or type;
+local getinfo = getinfo or debug.getinfo or function(l) return {func = debug.info(l, "f")} end;
+
+local placeholder = function(f) return {} end
+local getconstants, getupvalues, getprotos = getconstants or debug.getconstants or placeholder, getupvalues or debug.getupvalues or placeholder, getprotos or debug.getprotos or placeholder;
+local islclosure = islclosure or iscclosure and function(f) return not iscclosure(f) end or function(f) return true end
+local unpack = unpack or table.unpack
+local pairs = pairs;
+local next = next;
 
 local function areValuesInTable(original, toCheck)
     for i, v in pairs(toCheck) do
@@ -7,16 +15,6 @@ local function areValuesInTable(original, toCheck)
         end
     end
     return true;
-end
-
-local function GetChildrenOfClass(obj, className)
-    local children = {}
-    for i, v in pairs(obj:GetChildren()) do
-        if v.ClassName == className then
-            table.insert(children, v)
-        end
-    end
-    return children;
 end
 
 local function checkType(value, type, descr)
@@ -50,6 +48,38 @@ local luaBaseTypes = {
     ["function"] = true,
     table = true,
 }
+
+local blacklistedFunctions = {}
+local blacklistedTables = {}
+local createdSignatures = {}
+
+blacklistedTables[blacklistedTables] = true
+blacklistedTables[blacklistedFunctions] = true
+
+
+local charset = {}  do -- [0-9a-zA-Z]
+    for c = 48, 57  do table.insert(charset, string.char(c)) end
+    for c = 65, 90  do table.insert(charset, string.char(c)) end
+    for c = 97, 122 do table.insert(charset, string.char(c)) end
+end
+
+local function randomString(length)
+    local s = "";
+    for i = 1, length do
+        s = s .. charset[math.random(1, #charset)]
+    end
+    return s
+end
+
+local function generateSignature()
+    local sig = randomString(4);
+    createdSignatures[sig] = true
+    return sig
+end
+
+getgenv().blacklistedFunctions = blacklistedFunctions
+getgenv().blacklistedTables = blacklistedTables
+getgenv().createdSignatures = createdSignatures
 
 local filterTable;
 
@@ -100,13 +130,7 @@ do
         checkType(target, "table", "#1")
         checkType(filterOptions, "table", "#2")
 
-        local placeholder = function(f) return {} end
-        local pairs = pairs;
-        local next = next;
-        local getinfo = getinfo or debug.getinfo or placeholder;
-        local getconstants, getupvalues, getprotos = getconstants or debug.getconstants or placeholder, getupvalues or debug.getupvalues or placeholder, getprotos or debug.getprotos or placeholder;
-        local islclosure = islclosure or iscclosure and function(f) return not iscclosure(f) end or function(f) return true end
-        local unpack = unpack or table.unpack
+        blacklistedFunctions[getinfo(2).func] = true; -- do not check the caller in next scans
 
         local ft = {}
 
@@ -120,11 +144,6 @@ do
 
         function ft:createPath(copy, ...)
             return self:createWeakTable((copy and unpack(copy) or nil), ...)
-        end
-
-        function ft:insertToPath(path, pointer)
-            table.insert(path, pointer);
-            return path;
         end
 
         ft.filteredTables = ft:createWeakTable();
@@ -144,7 +163,7 @@ do
 
 
         function ft:checkTable(target, path)
-            if not self.running or self.filteredTables[target] then return end;
+            if not self.running or self.filteredTables[target] or createdSignatures[rawget(target, "SearchId")] then return end;
 
             self.filteredTables[target] = true
             self.parent = target;
@@ -153,10 +172,10 @@ do
 
             for i,v in next, target do
 
-                if not self.filteredFunctions[v] then
+                if not self.filteredFunctions[v] and not blacklistedFunctions[v] then
 
-                    local typ = luaType(v);
-                    if typ == filterOptions.type and (not checkClassName or v.ClassName == filterOptions.classname) and ((not validator and (checkIndex and self:checkIndex(i) or not checkIndex) and (not checkProperty or self:checkProperty(v)) and self:checkValue(v)) or validator and filterOptions.validator(i,v)) then
+                    local type = luaType(v);
+                    if type == filterOptions.type and (not checkClassName or v.ClassName == filterOptions.classname) and ((not validator and (not checkIndex or self:checkIndex(i)) and (not checkProperty or self:checkProperty(v)) and self:checkValue(v)) or validator and filterOptions.validator(i,v)) then
                         self:writeMatch(i, v, path)
                         if filterOptions.firstmatchonly then
                             self.running = false;
@@ -164,15 +183,17 @@ do
                         end
                     end
 
-                    if deepSearch and typ == "function" and islclosure(v) then
+                    if deepSearch and type == "function" then
                         self.filteredFunctions[v] = true
-                        self:checkTable(getconstants(v), logPath and self:createPath(path, v));
+                        if islclosure(v) then
+                            self:checkTable(getconstants(v), logPath and self:createPath(path, v));
+                            self:checkTable(getprotos(v), logPath and self:createPath(path, v));
+                            self:checkTable(getfenv(v), logPath and self:createPath(path, v));
+                        end
                         self:checkTable(getupvalues(v), logPath and self:createPath(path, v));
-                        self:checkTable(getprotos(v), logPath and self:createPath(path, v));
-                        self:checkTable(getfenv(v), logPath and self:createPath(path, v));
                     end
 
-                    if typ == "table" and (not nextScan or i ~= "Path") then
+                    if type == "table" and (not nextScan or not blacklistedTables[v]) then
                         deepFilter[#deepFilter+1] = v
                     end
 
@@ -193,7 +214,7 @@ do
         local function loadTypes()
 
             -- this is where the actual checking of the values will happen, this function is for pre-loading settings and type checking them before the code actually runs and starts checking the values
-            -- this huge amount of variables is created to avoid doing to many CALL's while table is being checked, so we "inline" all the settings beforehand to increase performance
+            -- this huge amount of variables is created to avoid doing too many CALL's while the values are being checked, so we "inline" all the settings beforehand to increase performance
 
             if filterOptions.type == "function" then
 
@@ -215,18 +236,29 @@ do
 
                 function ft:checkValue(value)
 
-                    if not islclosure(value) then return end
+                    if checkValue then return value == filterOptions.value end
 
                     if checkIgnoreEnv and table.find(self.env, value) then return end
 
                     local functionInfo = getinfo(value);
                     local upvalues = getupvalues(value);
-                    local constants = getconstants(value);
-                    local protos = getprotos(value);
 
                     if checkName and functionInfo.name ~= filterOptions.name then return end
 
                     if checkUpvalues and upvalues ~= filterOptions.upvalues then return end
+
+                    if not islclosure(value) then -- some of the others values below cant be checked in a cclosure
+                        return 
+                        (not checkMatchUpvalues or areValuesInTable(upvalues, filterOptions.matchupvalues)) and 
+                        (not checkUpvalueAmount or #upvalues == filterOptions.upvalueamount) and 
+                        (not checkInfo or functionInfo == filterOptions.info) and 
+                        (not checkMatchInfo or areValuesInTable(functionInfo, filterOptions.info)) and 
+                        (not checkScript or getScript(value) == filterOptions.script)
+                    end
+
+                    local constants = getconstants(value);
+                    local protos = getprotos(value);
+
                     if checkConstants and constants ~= filterOptions.constants then return end
                     if checkProtos and protos ~= filterOptions.protos then return end
 
@@ -379,7 +411,20 @@ do
         ft.running = true;
         ft:checkTable(target, ft:createPath({target}));
 
+        local signature = generateSignature();
+        --[[
+            we use a signature since its not possible to just hold the results table into a secondary table (such as blacklistedTables),
+            this will be too performance costly since the garbage collector wont be able to free the results
+            and since the results will - sometimes - carry its path within, that means the original table will start getting saved in many different places
+            resulting in a slower filterTable every time you execute you (incase you end up reaching it)
+            to avoid all that we just append a SearchId value to our results table, that way we ensure we can detect it and cause no performance cost
+        ]]
+
         local results = ft.results; 
+
+        for i,v in pairs(results) do
+            v.SearchId = signature;
+        end
 
         for i,v in pairs(ft.bag) do
             ft.bag[i] = nil
@@ -433,9 +478,11 @@ do
             return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan end end, __mode = "kv"})
         end
 
-        return setmetatable(results, {__index = function(self, i) if i == "nextScan" then return nextScan end end, __mode = "kv"});
+        return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan end end, __mode = "kv"});
     end
 
 end
+
+getgenv().filterTable = filterTable
 
 return filterTable
