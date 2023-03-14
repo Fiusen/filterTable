@@ -8,11 +8,9 @@ A Lua/Roblox function made to ***filter and deep search values inside a table***
 ```rs
             filterOptions = {
                 type = <lua type>
-                classname = <string>
-                property = <<string> roblox property> to check for values inside objects, e.g checking the CFrame property of BasePart's -> {type = "Instance", classname = "BasePart", property = "CFrame"}
                 firstmatchonly = <bool>
                 logpath = <bool> logs the path taken by the filterTable, may decrease performance
-                deepsearch = <bool> searches every function constants, upvalues, protos and env aswell, WILL DECREASE performance
+                deepsearch = <bool> searches every function constants, upvalues, protos and env aswels (will decrease performance)
                 validator = <<bool> function(i,v)> validates an entry using a function **will override the default checking, so using any options presented below will not work**
             }
 
@@ -44,12 +42,17 @@ A Lua/Roblox function made to ***filter and deep search values inside a table***
                 userdata -> 
                     metatable = <exact metatable of table>
                     hasmetatable = <bool>
+                    
+                [roblox type] ->
+                    classname = <string>
+                    property = <<string> roblox property name> for checking properties of objects, e.g checking the CFrame property of BasePart's -> {type = "Instance", classname = "BasePart", property = "CFrame", value = CFrame.new()} 
 
             return format = {
                 {
                   Value,
                   Index,
                   Parent,
+                  SearchId,
                   (additional values)
                 },
                 (...)
@@ -64,7 +67,7 @@ local tbl = {"testing", {"testing"}}
 local results = filterTable(tbl, {type = "string", value = "testing", logpath = true})
 
 for i,v in pairs(results) do
-   table.foreach(v,print)
+   table.foreach(v, print)
 end
 ```
 
@@ -79,6 +82,6 @@ tbl[1] = "not testing" -- change one of the values
 results = results.nextScan({type = "string", value = "testing", logpath = true}) -- will return only 1 value (the unchanged one)
 
 for i,v in pairs(results) do
-   table.foreach(v,print)
+   table.foreach(v, print)
 end
 ```
