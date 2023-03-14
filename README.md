@@ -1,4 +1,4 @@
- ![Top language](https://img.shields.io/badge/Lua-2C2D72?style=for-the-badge&logo=lua&logoColor=white) ![File size](https://img.shields.io/github/size/Fiusen/filterTable/filterTable.lua)
+ ![Languages](https://img.shields.io/github/languages/count/Fiusen/filterTable) ![Top language](https://img.shields.io/github/languages/top/Fiusen/filterTable) ![File size](https://img.shields.io/github/size/Fiusen/filterTable/filterTable.lua)
 
 # filterTable
 
