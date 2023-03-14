@@ -1,3 +1,5 @@
+[![Languages](https://img.shields.io/github/languages/count/Fiusen/filterTable) ![Top language](https://img.shields.io/github/languages/top/Fiusen/filterTable) ![File size](https://img.shields.io/github/size/Fiusen/filterTable/filterTable.lua)](https://github.com/Fiusen/filterTable)
+
 # filterTable
 
 A Lua/Roblox function made to ***filter and deep search values inside a table*** with blazing fast speed and lots of options, including a way to "next scan" from older results, making filtering dynamic values way easier.
