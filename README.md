@@ -10,7 +10,7 @@ A Lua/Roblox function made to ***filter and deep search values inside a table***
                 type = <lua type>
                 firstmatchonly = <bool>
                 logpath = <bool> logs the path taken by the filterTable, may decrease performance
-                deepsearch = <bool> searches every function constants, upvalues, protos and env aswels (will decrease performance)
+                deepsearch = <bool> searches every function constants, upvalues, protos and environment (will decrease performance)
                 validator = <<bool> function(i,v)> validates an entry using a function **will override the default checking, so using any options presented below will not work**
             }
 
