@@ -109,7 +109,7 @@ local filterTable;
                 protoAmount = <proto amount of function>
                 info = <exact debug.info table of function>
                 matchInfo = <table with required debug.info of function>
-                ignorEenv = <bool>
+                ignoreEnv = <bool>
                 script = <Instance <script>> **only for functions with "script" defined in their env**
 
 
@@ -186,7 +186,7 @@ do
                     local type = luaType(v);
                     if type == filterOptions.type and validator and filterOptions.validator(i,v) or not validator and self:checkValue(v) then
                         self:writeMatch(i, v, path)
-                        if filterOptions.firstmatchonly then
+                        if filterOptions.firstMatchOnly then
                             self.running = false;
                             break;
                         end
