@@ -110,3 +110,8 @@ for i,v in pairs(results) do
    ]]
 end
 ```
+
+Example usage on a roblox game (searching every single lua object in the garbage collector with deepSearch in 0.03s)
+
+https://user-images.githubusercontent.com/41023878/226069828-26dd80fa-7900-4c92-9ac3-89945e0d8f6c.mp4
+
