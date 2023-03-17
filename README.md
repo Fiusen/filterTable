@@ -68,24 +68,45 @@ A Lua/Roblox function made to ***filter and deep search values inside a table***
 
 ```lua
 local tbl = {"testing", {"testing"}}
-local results = filterTable(tbl, {type = "string", value = "testing", logPath = true})
+local results = filterTable(tbl, {type = "string", value = "testing"})
 
 for i,v in pairs(results) do
    table.foreach(v, print)
+      -- expected output:
+   
+   --[[
+        Index       1
+        Value       testing
+        Parent      table: 0x0000000000000000 (this is equivalent to tbl)
+        SearchId    a7HS (random)
+        
+        Index       1
+        Value       testing
+        Parent      table: 0x0000000000000001 (this is equivalent to tbl[2])
+        SearchId    a7HS (random)
+   ]]
 end
 ```
 
-nextScan usage example:
+#### Next Scan usage example:
 ```lua
 local tbl = {"testing", {"testing"}}
 
-local results = filterTable(tbl, {type = "string", value = "testing", logPath = true}) -- will return 2 values
+local results = filterTable(tbl, {type = "string", value = "testing"}) -- will return 2 values
 
 tbl[1] = "not testing" -- change one of the values
 
-results = results.nextScan({type = "string", value = "testing", logPath = true}) -- will return only 1 value (the unchanged one)
+results = results.nextScan({type = "string", value = "testing"}) -- will return only 1 value (the unchanged one)
 
 for i,v in pairs(results) do
    table.foreach(v, print)
+   -- expected output:
+   
+   --[[
+        Index       1
+        Value       testing
+        Parent      table: 0x0000000000000001 (this is equivalent to tbl[2])
+        SearchId    65CA (random)
+   ]]
 end
 ```
