@@ -33,7 +33,7 @@ A Lua/Roblox function made to ***filter and deep search values inside a table***
                 protoAmount = <proto amount of function>
                 info = <exact debug.info table of function>
                 matchInfo = <table with required debug.info of function>
-                ignorEenv = <bool>
+                ignoreEnv = <bool>
                 script = <Instance <script>> **only for functions with "script" defined in their env**
 
 
