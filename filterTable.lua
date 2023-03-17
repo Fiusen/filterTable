@@ -1,4 +1,4 @@
-local luaType = typeof and typeof or type;
+local luaType = typeof or type;
 local getinfo = getinfo or debug.getinfo or function(l) return {func = debug.info(l, "f")} end;
 
 local placeholder = function(f) return {} end
@@ -7,11 +7,21 @@ local islclosure = islclosure or iscclosure and function(f) return not iscclosur
 local getgenv = getgenv or getfenv;
 local unpack = unpack or table.unpack
 local pairs = pairs;
+local ipairs = ipairs;
 local next = next;
+
+local table_find = table.find or function(tbl, value) -- lua 5.1 has no table.find
+    for i, v in ipairs(tbl) do
+        if v == value then
+            return i
+        end
+    end
+end
+
 
 local function areValuesInTable(original, toCheck)
     for i, v in pairs(toCheck) do
-        if not table.find(original, v) then
+        if not table_find(original, v) then
             return false
         end
     end
@@ -19,10 +29,8 @@ local function areValuesInTable(original, toCheck)
 end
 
 local function checkType(value, type, descr)
-    err = "invalid argument to '"..descr.."' '"..type.."' expected got '%s'"
     local typ = luaType(value)
-    assert(typ == type, err:format(typ))
-    return true;
+    return assert(typ == type, ("invalid argument to '%s' ('%s' expected got '%s')"):format(descr, type, typ))
 end
 
 local function checkExists(value)
@@ -31,10 +39,8 @@ end
 
 local function checkIfType(value, type, descr)
     if not value then return end;
-    err = "invalid argument to '"..descr.."' '"..type.."' expected got '%s'"
     local typ = luaType(value)
-    assert(typ == type, err:format(typ))
-    return true;
+    return assert(typ == type, ("invalid argument to '%s' ('%s' expected got '%s')"):format(descr, type, typ))
 end
 
 local function getScript(f)
@@ -172,19 +178,19 @@ do
 
 
         function ft:checkTable(target, path)
-            if not self.running or self.filteredTables[target] or createdSignatures[rawget(target, "SearchId")] then return end;
+            if not self.running or self.filteredTables[target] or (createdSignatures[rawget(target, "SearchId")]) then return end;
 
             self.filteredTables[target] = true
             self.parent = target;
 
-            local deepFilter = self:createWeakTable();
+            local deepFilter;
 
             for i,v in next, target do
 
                 if not self.filteredFunctions[v] and not blacklistedFunctions[v] then
 
                     local type = luaType(v);
-                    if type == filterOptions.type and validator and filterOptions.validator(i,v) or not validator and self:checkValue(v) then
+                    if type == filterOptions.type and (validator and filterOptions.validator(i,v) or not validator and self:checkValue(v)) then
                         self:writeMatch(i, v, path)
                         if filterOptions.firstMatchOnly then
                             self.running = false;
@@ -203,6 +209,9 @@ do
                     end
 
                     if type == "table" and (not nextScan or not blacklistedTables[v]) then
+                        if not deepFilter then 
+                            deepFilter = self:createWeakTable();
+                        end
                         deepFilter[#deepFilter+1] = v
                     end
 
@@ -211,8 +220,10 @@ do
 
             if not self.running then return end
 
-            for i,v in next, deepFilter do
-                self:checkTable(v, logPath and self:createPath(path, v));
+            if deepFilter then
+                for i,v in next, deepFilter do
+                    self:checkTable(v, logPath and self:createPath(path, v));
+                end
             end
         end
 
@@ -243,7 +254,7 @@ do
 
                     if checkValue then return value == filterOptions.value end
 
-                    if checkIgnoreEnv and table.find(self.env, value) then return end
+                    if checkIgnoreEnv and table_find(self.env, value) then return end
 
                     local functionInfo = getinfo(value);
                     local upvalues = getupvalues(value);
@@ -323,8 +334,8 @@ do
 
                         if checkTableMatchIndex and checkTableMatchValue and rawget(value, filterOptions.tableMatch.index) == filterOptions.tableMatch.value then
                             return not checkTableMatchValidator or filterOptions.tableMatch.validator(filterOptions.tableMatch.index, rawget(value, filterOptions.tableMatch.index))
-                        elseif not checkTableMatchIndex and checkTableMatchValue and table.find(value, filterOptions.tableMatch.value) then
-                            return not checkTableMatchValidator or filterOptions.tableMatch.validator(table.find(value, filterOptions.tableMatch.value), filterOptions.tableMatch.value)
+                        elseif not checkTableMatchIndex and checkTableMatchValue and table_find(value, filterOptions.tableMatch.value) then
+                            return not checkTableMatchValidator or filterOptions.tableMatch.validator(table_find(value, filterOptions.tableMatch.value), filterOptions.tableMatch.value)
                         elseif checkTableMatchIndex and not checkTableMatchValue and checkExists(rawget(value, filterOptions.tableMatch.index)) then
                             return not checkTableMatchValidator or filterOptions.tableMatch.validator(filterOptions.tableMatch.index, rawget(value, filterOptions.tableMatch.index))
                         end
@@ -382,7 +393,7 @@ do
                 local checkClassName = checkIfType(filterOptions.className, "string", "filterOptions.className");
 
                 function ft:checkValue(value)
-                    return not checkClassName or v.ClassName == filterOptions.className and not checkProperty or self:checkProperty(value) and not checkValue or filterOptions.value == value
+                    return not checkClassName or value.ClassName == filterOptions.className and (checkProperty and value[filterOptions.property] == filterOptions.value or not checkProperty and checkValue and filterOptions.value == value)
                 end
 
                 function ft:writeMatch(index, value, path)
@@ -394,10 +405,6 @@ do
                     if filterOptions.logPath then match.Path = path end
 
                     table.insert(self.results, match)
-                end
-
-                function ft:checkProperty(value)
-                    return value[filterOptions.property] == filterOptions.value
                 end
 
             else
@@ -464,7 +471,7 @@ do
             loadTypes();
 
             for i,v in next, latestResults do
-                if luaType(v) == filterOptions.type and not validator or self:checkValue(v) or validator and filterOptions.validator(i,v) then
+                if luaType(v) == filterOptions.type and (validator and filterOptions.validator(i,v) or not validator and self:checkValue(v)) then
                     table.insert(ft.results, v)
                 end
             end
