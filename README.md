@@ -12,9 +12,9 @@ A Lua/Roblox function made to ***filter and deep search values inside a table***
 
     filterOptions = {
                 type = <lua type> searches for the specific given type
-                firstmatchonly = <bool> whether or not only the first matched value will be returned
-                logpath = <bool> logs the path taken by the filterTable, may decrease performance
-                deepsearch = <bool> searches every function constants, upvalues, protos and env (will decrease performance)
+                firstMatchOnly = <bool> whether or not only the first matched value will be returned
+                logPath = <bool> logs the path taken by the filterTable, may decrease performance
+                deepSearch = <bool> searches every function constants, upvalues, protos and env (will decrease performance)
                 validator = <<bool> function(i,v)> validates an entry using a function **will override the default checking, so using any options presented below will not work**
             }
 
