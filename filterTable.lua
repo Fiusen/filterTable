@@ -176,14 +176,13 @@ do
 
         ft.mainScan = target;
 
-
         function ft:checkTable(target, path)
-            if not self.running or self.filteredTables[target] or (createdSignatures[rawget(target, "SearchId")]) then return end;
+            if not self.running or self.filteredTables[target] or blacklistedTables[target] or createdSignatures[rawget(target, "SearchId")] then return end;
 
             self.filteredTables[target] = true
-            self.parent = target;
 
-            local deepFilter;
+            local currentParent = target; -- unfortunate but needed for performance gain
+            self.parent = target;
 
             for i,v in next, target do
 
@@ -200,31 +199,27 @@ do
 
                     if deepSearch and type == "function" then
                         self.filteredFunctions[v] = true
+                        local newPath = logPath and self:createPath(path, v);
                         if islclosure(v) then
-                            self:checkTable(getconstants(v), logPath and self:createPath(path, v));
-                            self:checkTable(getprotos(v), logPath and self:createPath(path, v));
-                            self:checkTable(getfenv(v), logPath and self:createPath(path, v));
+                            self:checkTable(getconstants(v), newPath) self.parent = currentParent;
+                            self:checkTable(getprotos(v), newPath) self.parent = currentParent;
+                            self:checkTable(getfenv(v), newPath) self.parent = currentParent;
                         end
-                        self:checkTable(getupvalues(v), logPath and self:createPath(path, v));
+                        self:checkTable(getupvalues(v), newPath) self.parent = currentParent;
                     end
 
                     if type == "table" and (not nextScan or not blacklistedTables[v]) then
-                        if not deepFilter then 
-                            deepFilter = self:createWeakTable();
-                        end
-                        deepFilter[#deepFilter+1] = v
+                        self:checkTable(v, logPath and self:createPath(path, v)) self.parent = currentParent;
                     end
 
                 end
+
+
             end
+
 
             if not self.running then return end
 
-            if deepFilter then
-                for i,v in next, deepFilter do
-                    self:checkTable(v, logPath and self:createPath(path, v));
-                end
-            end
         end
 
         local function loadTypes()
@@ -393,7 +388,7 @@ do
                 local checkClassName = checkIfType(filterOptions.className, "string", "filterOptions.className");
 
                 function ft:checkValue(value)
-                    return not checkClassName or value.ClassName == filterOptions.className and (checkProperty and value[filterOptions.property] == filterOptions.value or not checkProperty and checkValue and filterOptions.value == value)
+                    return not checkClassName or value.ClassName == filterOptions.className and (checkProperty and value[filterOptions.property] == filterOptions.value or not checkProperty and checkValue and filterOptions.value == value or not checkProperty and not checkValue)
                 end
 
                 function ft:writeMatch(index, value, path)
@@ -410,7 +405,7 @@ do
             else
 
                 function ft:checkValue(value)
-                    return checkValue and filterOptions.value == value;
+                    return not checkValue or filterOptions.value == value;
                 end
 
                 function ft:writeMatch(index, value, path)
@@ -430,9 +425,11 @@ do
 
         ft.env = getfenv();
         ft.results = ft:createWeakTable();
+        blacklistedTables[filterOptions] = true
 
         ft.running = true;
-        ft:checkTable(target, ft:createPath({target}));
+        ft:checkTable(target, logPath and ft:createPath({target}));
+
 
         local signature = generateSignature();
         --[[
@@ -488,10 +485,10 @@ do
                 end
             end
 
-            return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan end end, __mode = "kv"})
+            return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan end end})
         end
 
-        return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan end end, __mode = "kv"});
+        return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan end end});
     end
 
 end
