@@ -70,7 +70,7 @@ A Lua/Roblox function made to ***filter and deep search values inside a table***
 local tbl = {"testing", {"testing"}}
 local results = filterTable(tbl, {type = "string", value = "testing"})
 
-for i,v in pairs(results) do
+for i,v in pairs(results) do -- you can also use results.print() instead of this
    table.foreach(v, print)
       -- expected output:
    
@@ -114,4 +114,32 @@ end
 Example usage on a roblox game (searching every single lua object in the garbage collector with deepSearch in 0.03s)
 
 https://user-images.githubusercontent.com/41023878/226069828-26dd80fa-7900-4c92-9ac3-89945e0d8f6c.mp4
+
+
+##### Print Method
+
+Instead of looping through results and printing each results table manually you can use the `print` method appended to every result of filterTable
+
+```lua
+local tbl = {"testing", {"testing"}}
+local results = filterTable(tbl, {type = "string", value = "testing"})
+results.print()
+
+-- expected output:
+
+--[[
+
+filterTable (result #1)
+Index       1
+Value       testing
+Parent      table: 0x0000000000000000 (this is equivalent to tbl)
+SearchId    klF1 (random)
+ 
+filterTable (result #2)
+Index       1
+Value       testing
+Parent      table: 0x0000000000000001 (this is equivalent to tbl[2])
+SearchId    klF1 (random)
+]]
+```
 
