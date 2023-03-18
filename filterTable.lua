@@ -5,6 +5,9 @@ local placeholder = function(f) return {} end
 local getconstants, getupvalues, getprotos = getconstants or debug.getconstants or placeholder, getupvalues or debug.getupvalues or placeholder, getprotos or debug.getprotos or placeholder;
 local islclosure = islclosure or iscclosure and function(f) return not iscclosure(f) end or function(f) return true end
 local getgenv = getgenv or getfenv;
+local getrawmetatable = getrawmetatable;
+
+local rawget = rawget;
 local unpack = unpack or table.unpack
 local pairs = pairs;
 local ipairs = ipairs;
@@ -15,6 +18,23 @@ local table_find = table.find or function(tbl, value) -- lua 5.1 has no table.fi
         if v == value then
             return i
         end
+    end
+end
+
+local tostr = function(str)
+    if not getrawmetatable then return tostring(str) end
+    local mt = getrawmetatable(str)
+    local copy = mt and rawget(mt, "__tostring");
+    if copy then 
+        local isReadOnly = isreadonly(mt)
+        setreadonly(mt, false)
+        rawset(mt, "__tostring", nil)
+        local r = tostring(str)
+        rawset(mt, "__tostring", copy)
+        setreadonly(mt, isReadOnly)
+        return r
+    else
+        return tostring(str)
     end
 end
 
@@ -41,6 +61,13 @@ local function checkIfType(value, type, descr)
     if not value then return end;
     local typ = luaType(value)
     return assert(typ == type, ("invalid argument to '%s' ('%s' expected got '%s')"):format(descr, type, typ))
+end
+
+
+local function returnIfType(value, type, descr, returnValue)
+    local typ = luaType(value)
+    assert(typ == type, ("invalid argument to '%s' ('%s' expected got '%s')"):format(descr, type, typ))
+    return value;
 end
 
 local function getScript(f)
@@ -442,7 +469,7 @@ do
 
         local results = ft.results; 
 
-        for i,v in pairs(results) do
+        for i,v in ipairs(results) do
             v.SearchId = signature;
         end
 
@@ -450,45 +477,71 @@ do
             ft.bag[i] = nil
         end
 
-        local nextScan;
+        local nextScan, display;
 
-        nextScan = function(nextScanFilterOptions)
+        do -- extra functions
 
-            local latestResults = ft.results;
+            nextScan = function(nextScanFilterOptions) -- scans latest results with given filterOptions
 
-            ft.running = true;
+                nextScanFilterOptions = returnIfType(nextScanFilterOptions, "table", "#1")
 
-            ft.results = ft:createWeakTable(); -- clean for new entries
+                local latestResults = ft.results;
 
-            ft.filteredTables = ft:createWeakTable()
-            ft.filteredFunctions = ft:createWeakTable()
+                ft.running = true;
 
-            filterOptions = nextScanFilterOptions;
+                ft.results = ft:createWeakTable(); -- clean for new entries
 
-            loadTypes();
+                ft.filteredTables = ft:createWeakTable()
+                ft.filteredFunctions = ft:createWeakTable()
 
-            for i,v in next, latestResults do
-                if luaType(v) == filterOptions.type and (validator and filterOptions.validator(i,v) or not validator and self:checkValue(v)) then
-                    table.insert(ft.results, v)
+                filterOptions = nextScanFilterOptions;
+
+                loadTypes();
+
+                for i,v in ipairs(latestResults) do
+                    v = v.Value;
+                    if luaType(v) == filterOptions.type and (validator and filterOptions.validator(i,v) or not validator and self:checkValue(v)) then
+                        table.insert(ft.results, v)
+                    end
                 end
+
+                do -- gc and sig
+                    local results = ft.results; 
+
+                    for i,v in ipairs(results) do
+                        v.SearchId = signature;
+                    end
+
+                    for i,v in pairs(ft.bag) do
+                        ft.bag[i] = nil
+                    end
+                end
+
+                return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan elseif i == "display" then return display end end})
             end
 
-            do -- gc and sig
-                local results = ft.results; 
+            display = function(limit) -- displays all (or limit) results found in console
 
-                for i,v in pairs(results) do
-                    v.SearchId = signature;
+                limit = returnIfType(limit, "number", "#1")
+
+                local warn = warn or print;
+
+                print("\n")
+
+                for i, v in ipairs(ft.results) do
+                    warn("filterTable (result #"..i..")")
+                    for i, v in pairs(v) do
+                        print(i, tostr(v))
+                    end
+                    print("\n")
+                    if limit and i == limit then break end
                 end
 
-                for i,v in pairs(ft.bag) do
-                    ft.bag[i] = nil
-                end
             end
 
-            return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan end end})
         end
 
-        return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan end end});
+        return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan elseif i == "display" then return display end end})
     end
 
 end
