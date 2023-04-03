@@ -117,14 +117,14 @@ Example usage on a roblox game (searching every single lua object in the garbage
 https://user-images.githubusercontent.com/41023878/226069828-26dd80fa-7900-4c92-9ac3-89945e0d8f6c.mp4
 
 
-##### Print Method
+##### Display Method
 
-Instead of looping through results and printing each results table manually you can use the `print` method appended to every result of filterTable
+Instead of looping through results and printing each results table manually you can use the `display` method appended to every result of filterTable
 
 ```lua
 local tbl = {"testing", {"testing"}}
 local results = filterTable(tbl, {type = "string", value = "testing"})
-results.print()
+results.display()
 
 -- expected output:
 
