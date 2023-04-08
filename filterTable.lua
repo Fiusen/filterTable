@@ -7,14 +7,19 @@ local islclosure = islclosure or iscclosure and function(f) return not iscclosur
 local getgenv = getgenv or getfenv;
 local getrawmetatable = getrawmetatable;
 
+local oldGetScripts = getscripts;
+local getscripts = getscripts and (function()
+    return oldGetScripts();
+end)
+
 local rawget = rawget;
 local unpack = unpack or table.unpack
 local pairs = pairs;
 local ipairs = ipairs;
 local next = next;
 
-local table_find = table.find or function(tbl, value) -- lua 5.1 has no table.find
-    for i, v in ipairs(tbl) do
+local table_find = function(tbl, value) -- table.find skips over nil values (???) and constants could have them
+    for i, v in pairs(tbl) do
         if v == value then
             return i
         end
@@ -65,6 +70,7 @@ end
 
 
 local function returnIfType(value, type, descr, returnValue)
+    if not value then return end;
     local typ = luaType(value)
     assert(typ == type, ("invalid argument to '%s' ('%s' expected got '%s')"):format(descr, type, typ))
     return value;
@@ -83,12 +89,12 @@ local luaBaseTypes = {
     table = true,
 }
 
-local blacklistedFunctions = {}
+local blacklistedValues = {}
 local blacklistedTables = {}
 local createdSignatures = {}
 
 blacklistedTables[blacklistedTables] = true
-blacklistedTables[blacklistedFunctions] = true
+blacklistedTables[blacklistedValues] = true
 blacklistedTables[createdSignatures] = true
 
 
@@ -112,7 +118,7 @@ local function generateSignature()
     return sig
 end
 
-getgenv().blacklistedFunctions = blacklistedFunctions
+getgenv().blacklistedValues = blacklistedValues
 getgenv().blacklistedTables = blacklistedTables
 getgenv().createdSignatures = createdSignatures
 
@@ -176,14 +182,15 @@ do
         checkType(target, "table", "#1")
         checkType(filterOptions, "table", "#2")
 
-        blacklistedFunctions[getinfo(2).func] = true; -- do not check the caller in next scans
+        blacklistedValues[getinfo(2).func] = true; -- do not check the caller in next scans
+        blacklistedValues[getfenv(2).script] = true; -- do not check the caller script in next scans
 
         local ft = {}
 
         ft.bag = {}
 
         function ft:createWeakTable(...)
-            local wt =  setmetatable({...}, {__mode = "kv"})
+            local wt =  setmetatable({...}, {__mode = "v"})
             table.insert(ft.bag, wt)
             return wt;
         end
@@ -198,8 +205,17 @@ do
         local checkValue = checkExists(filterOptions.value);
 
         local deepSearch = checkIfType(filterOptions.deepSearch, "boolean", "filterOptions.deepSearch");
+        local searchScripts = checkIfType(filterOptions.searchScripts, "boolean", "filterOptions.searchScripts");
+        local searchEnv = checkIfType(filterOptions.searchEnv, "boolean", "filterOptions.searchEnv");
+
         local logPath = checkIfType(filterOptions.logPath, "boolean", "filterOptions.logPath");
         local validator = checkIfType(filterOptions.validator, "function", "filterOptions.validator");
+            
+        if validator then -- do not search on validator function
+            blacklistedValues[filterOptions.validator] = true 
+        end
+
+        local noType = not filterOptions.type and validator -- filterTable will only work based on validator, any type would pass
 
         ft.mainScan = target;
 
@@ -213,10 +229,10 @@ do
 
             for i,v in next, target do
 
-                if not self.filteredFunctions[v] and not blacklistedFunctions[v] then
+                if not self.filteredFunctions[v] and not blacklistedValues[v] then
 
                     local type = luaType(v);
-                    if type == filterOptions.type and (validator and filterOptions.validator(i,v) or not validator and self:checkValue(v)) then
+                    if (type == filterOptions.type or noType) and (validator and filterOptions.validator(i, v) or not validator and self:checkValue(v)) then
                         self:writeMatch(i, v, path)
                         if filterOptions.firstMatchOnly then
                             self.running = false;
@@ -233,6 +249,29 @@ do
                             self:checkTable(getfenv(v), newPath) self.parent = currentParent;
                         end
                         self:checkTable(getupvalues(v), newPath) self.parent = currentParent;
+                    end
+
+                    if searchScripts and type == "Instance" and (v.ClassName == "LocalScript" or v.ClassName == "ModuleScript") then
+                        self.filteredFunctions[v] = true;
+
+                        local newPath = logPath and self:createPath(path, v);
+
+                        local scriptClosure = getscriptclosure(v);
+                        if scriptClosure then
+                            self:checkTable(self:createWeakTable(scriptClosure), newPath) self.parent = currentParent;
+                        end
+
+                        if searchEnv then
+                            local scriptEnv;
+            
+                            local s, e = pcall(getsenv, v); -- no other way to check if script is running
+                            scriptEnv = s and e;
+
+                            if scriptEnv then
+                                self:checkTable(scriptEnv, newPath) self.parent = currentParent
+                            end
+                        end
+
                     end
 
                     if type == "table" and (not nextScan or not blacklistedTables[v]) then
@@ -286,7 +325,13 @@ do
                     if checkUpvalues and upvalues ~= filterOptions.upvalues then return end
 
                     if not islclosure(value) then -- some of the others values below cant be checked in a cclosure
-                        return 
+
+                        -- cant check those in c closures
+                        if (checkConstantAmount or checkConstants or checkMatchConstants or checkProtoAmount or checkProtos or checkMatchProtos) then
+                            return false;
+                        end
+
+                        return
                         (not checkMatchUpvalues or areValuesInTable(upvalues, filterOptions.matchUpvalues)) and 
                         (not checkUpvalueAmount or #upvalues == filterOptions.upvalueAmount) and 
                         (not checkInfo or functionInfo == filterOptions.info) and 
@@ -326,8 +371,6 @@ do
                 end
 
             elseif filterOptions.type == "table" then
-
-                local checkIndex = filterOptions.type == "table" and checkExists(filterOptions.index);
                 
                 local checkTableSize = checkIfType(filterOptions.tableSize, "number", "filterOptions.tableSize");
                 local checkMetatable = checkIfType(filterOptions.metatable, "table", "filterOptions.metatable");
@@ -338,10 +381,18 @@ do
                 local checkTableMatchIndex = checkTableMatch and checkExists(filterOptions.tableMatch.index)
                 local checkTableMatchValue = checkTableMatch and checkExists(filterOptions.tableMatch.value)
                 local checkTableMatchValidator = checkTableMatch and checkIfType(filterOptions.tableMatch.validator, "function", "filterOptions.tableMatch.validator")
+                
+                local checkValues = checkIfType(filterOptions.matchValues, "table", "filterOptions.values")    
+                local checkMatchValues = checkIfType(filterOptions.matchValues, "table", "filterOptions.matchValues")    
+                    
+                local matchIndex = checkTableMatchIndex and filterOptions.tableMatch.index
+                local matchValue = checkTableMatchValue and filterOptions.tableMatch.value
 
                 function ft:checkValue(value)
 
-                    if checkIndex and not self:checkIndex(i) then return end
+                    if checkMatchValues and not areValuesInTable(value, checkMatchValues) then return end
+
+                    if checkValues and not areValuesInTable(checkValues, value) then return end
 
                     if checkValue and value ~= filterOptions.value then return end
 
@@ -354,21 +405,19 @@ do
 
                     if checkTableMatch then
 
-                        if checkTableMatchIndex and checkTableMatchValue and rawget(value, filterOptions.tableMatch.index) == filterOptions.tableMatch.value then
-                            return not checkTableMatchValidator or filterOptions.tableMatch.validator(filterOptions.tableMatch.index, rawget(value, filterOptions.tableMatch.index))
-                        elseif not checkTableMatchIndex and checkTableMatchValue and table_find(value, filterOptions.tableMatch.value) then
-                            return not checkTableMatchValidator or filterOptions.tableMatch.validator(table_find(value, filterOptions.tableMatch.value), filterOptions.tableMatch.value)
-                        elseif checkTableMatchIndex and not checkTableMatchValue and checkExists(rawget(value, filterOptions.tableMatch.index)) then
-                            return not checkTableMatchValidator or filterOptions.tableMatch.validator(filterOptions.tableMatch.index, rawget(value, filterOptions.tableMatch.index))
+                        if checkTableMatchIndex and checkTableMatchValue and rawget(value, matchIndex) == matchValue then
+                            return not checkTableMatchValidator or filterOptions.tableMatch.validator(matchIndex, rawget(value, matchIndex))
+                        elseif not checkTableMatchIndex and checkTableMatchValue and table_find(value, matchValue) then
+                            return not checkTableMatchValidator or filterOptions.tableMatch.validator(table_find(value, matchValue), matchValue)
+                        elseif checkTableMatchIndex and not checkTableMatchValue and checkExists(rawget(value, matchIndex)) then
+                            return not checkTableMatchValidator or filterOptions.tableMatch.validator(matchIndex, rawget(value, matchIndex))
                         end
 
-                        return false;
+                        return;
                         
                     end
-                end
-                
-                function ft:checkIndex(index)
-                    return index == filterOptions.Index
+                    
+                    return true;
                 end
 
                 function ft:writeMatch(index, value, path)
@@ -454,6 +503,7 @@ do
         ft.results = ft:createWeakTable();
         blacklistedTables[filterOptions] = true
 
+
         ft.running = true;
         ft:checkTable(target, logPath and ft:createPath({target}));
 
@@ -526,12 +576,26 @@ do
 
                 local warn = warn or print;
 
+                if #ft.results == 0 then
+                    return warn("\nfilterTable found #0 entries\n")
+                else
+                    warn("\nfilterTable found #"..#ft.results.." entries")
+                end
+
                 print("\n")
 
                 for i, v in ipairs(ft.results) do
                     warn("filterTable (result #"..i..")")
                     for i, v in pairs(v) do
-                        print(i, tostr(v))
+                        if i == "Path" then
+                            warn("", i, tostr(v), "->\n")
+                            for i, v in pairs(v) do
+                                print(" ", i, tostr(v))
+                            end
+                            print("\n")
+                        else
+                            print(i, tostr(v))
+                        end
                     end
                     print("\n")
                     if limit and i == limit then break end
@@ -543,9 +607,10 @@ do
 
         return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan elseif i == "display" then return display end end})
     end
-
+    
 end
 
 getgenv().filterTable = filterTable
 
 return filterTable
+
