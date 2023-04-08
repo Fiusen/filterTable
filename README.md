@@ -119,7 +119,9 @@ https://user-images.githubusercontent.com/41023878/226069828-26dd80fa-7900-4c92-
 
 ##### Display Method
 
-Instead of looping through results and printing each results table manually you can use the `display` method appended to every result of filterTable
+Instead of looping through results and printing each results table manually you can use the `display(limit)` method appended to every result of filterTable.
+
+`limit` is the max amount of results to be displayed, if its nil, it will print every entry
 
 ```lua
 local tbl = {"testing", {"testing"}}
