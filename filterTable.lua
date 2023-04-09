@@ -1,6 +1,6 @@
 local luaType = typeof or type;
-local getinfo = getinfo or debug.getinfo or function(l) return {func = debug.info(l, "f")} end;
-
+local getinfo = getinfo or debug.getinfo
+local getCaller = getinfo and function(l) return getinfo(l).func end or function(l) return debug.info(l, "f") end
 local placeholder = function(f) return {} end
 local getconstants, getupvalues, getprotos = getconstants or debug.getconstants or placeholder, getupvalues or debug.getupvalues or placeholder, getprotos or debug.getprotos or placeholder;
 local islclosure = islclosure or iscclosure and function(f) return not iscclosure(f) end or function(f) return true end
@@ -118,6 +118,10 @@ local function generateSignature()
     return sig
 end
 
+local function checkSignature(sig)
+    return createdSignatures[sig]
+end
+
 getgenv().blacklistedValues = blacklistedValues
 getgenv().blacklistedTables = blacklistedTables
 getgenv().createdSignatures = createdSignatures
@@ -127,7 +131,7 @@ local filterTable;
         --[[
               filterOptions = {
                 type = <lua type> searches for the specific given type
-                firstmatchonly = <bool> whether or not only the first matched value will be returned
+                returnFirst = <bool> whether or not only the first matched value will be returned
                 logpath = <bool> logs the path taken by the filterTable, may decrease performance
                 deepsearch = <bool> searches every function constants, upvalues, protos and env (will decrease performance)
                 validator = <<bool> function(i,v)> validates an entry using a function **will override the default checking, so using any options presented below will not work**
@@ -178,12 +182,20 @@ local filterTable;
      }
         ]]
 do
-    filterTable = function(target, filterOptions, nextScan)
+    filterTable = function(target, filterOptions, isNextScan)
         checkType(target, "table", "#1")
         checkType(filterOptions, "table", "#2")
 
-        blacklistedValues[getinfo(2).func] = true; -- do not check the caller in next scans
-        blacklistedValues[getfenv(2).script] = true; -- do not check the caller script in next scans
+        local caller = getCaller(2)
+        local fenv = getfenv(isNextScan and 1 or 2)
+
+        if caller then
+            blacklistedValues[caller] = true; -- do not check the caller in next scans
+        end
+        
+        if fenv and fenv.script then
+            blacklistedValues[fenv.script] = true; -- do not check the caller script in next scans
+        end
 
         local ft = {}
 
@@ -220,7 +232,7 @@ do
         ft.mainScan = target;
 
         function ft:checkTable(target, path)
-            if not self.running or self.filteredTables[target] or blacklistedTables[target] or createdSignatures[rawget(target, "SearchId")] then return end;
+            if not self.running or self.filteredTables[target] or blacklistedTables[target] or checkSignature(rawget(target, "SearchId")) then return end;
 
             self.filteredTables[target] = true
 
@@ -233,8 +245,15 @@ do
 
                     local type = luaType(v);
                     if (type == filterOptions.type or noType) and (validator and filterOptions.validator(i, v) or not validator and self:checkValue(v)) then
-                        self:writeMatch(i, v, path)
-                        if filterOptions.firstMatchOnly then
+                        
+                        if isNextScan and checkSignature(rawget(currentParent, "ScanId")) then
+                            local info = currentParent;
+                            self.parent = info.Parent self:writeMatch(info.Index, v, path) self.parent = currentParent;
+                        else
+                            self:writeMatch(i, v, path)
+                        end
+
+                        if filterOptions.returnFirst then
                             self.running = false;
                             break;
                         end
@@ -274,7 +293,7 @@ do
 
                     end
 
-                    if type == "table" and (not nextScan or not blacklistedTables[v]) then
+                    if (type == "table" and not blacklistedTables[v] and not (isNextScan and checkSignature(rawget(currentParent, "ScanId")) and v == currentParent.Parent)) then
                         self:checkTable(v, logPath and self:createPath(path, v)) self.parent = currentParent;
                     end
 
@@ -506,8 +525,7 @@ do
         ft:checkTable(target, logPath and ft:createPath(ft:createWeakTable(target)));
 
 
-        local signature = generateSignature();
-        --[[
+        local signature = generateSignature(); --[[
             we use a signature since its not possible to just hold the results table into a secondary table (such as blacklistedTables),
             this will be too performance costly since the garbage collector wont be able to free the results
             and since the results will - sometimes - carry its path within, that means the original table will start getting saved in many different places
@@ -536,10 +554,15 @@ do
                 local foundValues = ft:createWeakTable();
 
                 for i,v in ipairs(ft.results) do
-                    table.insert(foundValues, v.Value)
+                    table.insert(foundValues, { -- made to mantain index and parent static in-between scans
+                        Value = v.Parent and rawget(v.Parent, v.Index),
+                        Parent = v.Parent,
+                        Index = v.Index,
+                        ScanId = v.SearchId,
+                    })
                 end
 
-                return filterTable(foundValues, nextScanFilterOptions);
+                return filterTable(foundValues, nextScanFilterOptions or filterOptions, true);
             end
 
             display = function(limit) -- displays all (or limit) results found in console
@@ -584,5 +607,4 @@ end
 
 getgenv().filterTable = filterTable
 
-return filterTable
-
+return filterTable;
