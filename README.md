@@ -2,7 +2,7 @@
 
 # filterTable
 
-A Lua/Roblox function made to ***filter and deep search values inside a table*** with blazing fast speed and custom filter options, including a "Next Scan" feature, making filtering dynamic values way easier.
+A Lua/Roblox function made to ***filter and deep search values inside a table*** with blazing fast speed and custom filter options, including a "Next Scan" feature, making filtering dynamic/specific values way easier.
 
 
 
