@@ -82,11 +82,11 @@ local function getScript(f)
 end
 
 local luaBaseTypes = {
-    string = true,
-    number = true,
-    userdata = true,
+    ["string"] = true,
+    ["number"] = true,
+    ["userdata"] = true,
     ["function"] = true,
-    table = true,
+    ["table"] = true,
 }
 
 local blacklistedValues = {}
@@ -224,7 +224,7 @@ do
 
             self.filteredTables[target] = true
 
-            local currentParent = target; -- unfortunate but needed for performance gain
+            local currentParent = target; -- unfortunate but needed for performance gain (see below)
             self.parent = target;
 
             for i,v in next, target do
@@ -261,7 +261,7 @@ do
                             self:checkTable(self:createWeakTable(scriptClosure), newPath) self.parent = currentParent;
                         end
 
-                        if searchEnv then
+                        if searchEnv then -- waiting on syn fix...
                             local scriptEnv;
             
                             local s, e = pcall(getsenv, v); -- no other way to check if script is running
@@ -295,34 +295,33 @@ do
 
             if filterOptions.type == "function" then
 
-                local checkName = checkIfType(filterOptions.name, "string", "filterOptions.name");
-                local checkUpvalues = checkIfType(filterOptions.upvalues, "table", "filterOptions.upvalues");
-                local checkConstants = checkIfType(filterOptions.constants, "table", "filterOptions.constants")    
-                local checkProtos = checkIfType(filterOptions.protos, "table", "filterOptions.protos");
-                local checkMatchUpvalues = checkIfType(filterOptions.matchUpvalues, "table", "filterOptions.matchUpvalues")    
-                local checkMatchConstants = checkIfType(filterOptions.matchConstants, "table", "filterOptions.matchConstants");
-                local checkMatchProtos = checkIfType(filterOptions.matchProtos, "table", "filterOptions.matchProtos")    
-                local checkUpvalueAmount = checkIfType(filterOptions.upvalueAmount, "number", "filterOptions.upvalueAmount");
-                local checkConstantAmount = checkIfType(filterOptions.constantAmount, "number", "filterOptions.constantAmount")    
-                local checkProtoAmount = checkIfType(filterOptions.protoAmount, "number", "filterOptions.protoAmount")    
-                local checkInfo = checkIfType(filterOptions.info, "table", "filterOptions.info")    
-                local checkMatchInfo = checkIfType(filterOptions.matchInfo, "table", "filterOptions.matchInfo")    
-                local checkIgnoreEnv = checkIfType(filterOptions.ignoreEnv, "boolean", "filterOptions.ignoreEnv")    
-                local checkScript = checkIfType(filterOptions.script, "Instance", "filterOptions.script")    
-
+                local checkName = returnIfType(filterOptions.name, "string", "filterOptions.name");
+                local checkUpvalues = returnIfType(filterOptions.upvalues, "table", "filterOptions.upvalues");
+                local checkConstants = returnIfType(filterOptions.constants, "table", "filterOptions.constants")    
+                local checkProtos = returnIfType(filterOptions.protos, "table", "filterOptions.protos");
+                local checkMatchUpvalues = returnIfType(filterOptions.matchUpvalues, "table", "filterOptions.matchUpvalues")    
+                local checkMatchConstants = returnIfType(filterOptions.matchConstants, "table", "filterOptions.matchConstants");
+                local checkMatchProtos = returnIfType(filterOptions.matchProtos, "table", "filterOptions.matchProtos")    
+                local checkUpvalueAmount = returnIfType(filterOptions.upvalueAmount, "number", "filterOptions.upvalueAmount");
+                local checkConstantAmount = returnIfType(filterOptions.constantAmount, "number", "filterOptions.constantAmount")    
+                local checkProtoAmount = returnIfType(filterOptions.protoAmount, "number", "filterOptions.protoAmount")    
+                local checkInfo = returnIfType(filterOptions.info, "table", "filterOptions.info")    
+                local checkMatchInfo = returnIfType(filterOptions.matchInfo, "table", "filterOptions.matchInfo")    
+                local checkIgnoreEnv = returnIfType(filterOptions.ignoreEnv, "boolean", "filterOptions.ignoreEnv")    
+                local checkScript = returnIfType(filterOptions.script, "Instance", "filterOptions.script")    
 
                 function ft:checkValue(value)
 
                     if checkValue then return value == filterOptions.value end
 
-                    if checkIgnoreEnv and table_find(self.env, value) then return end
+                    if checkIgnoreEnv and (rawget(self.env, value) or table_find(self.env, value)) then return end
 
                     local functionInfo = getinfo(value);
                     local upvalues = getupvalues(value);
 
-                    if checkName and functionInfo.name ~= filterOptions.name then return end
+                    if checkName and functionInfo.name ~= checkName then return end
 
-                    if checkUpvalues and upvalues ~= filterOptions.upvalues then return end
+                    if checkUpvalues and upvalues ~= checkUpvalues then return end
 
                     if not islclosure(value) then -- some of the others values below cant be checked in a cclosure
 
@@ -332,31 +331,31 @@ do
                         end
 
                         return
-                        (not checkMatchUpvalues or areValuesInTable(upvalues, filterOptions.matchUpvalues)) and 
-                        (not checkUpvalueAmount or #upvalues == filterOptions.upvalueAmount) and 
-                        (not checkInfo or functionInfo == filterOptions.info) and 
-                        (not checkMatchInfo or areValuesInTable(functionInfo, filterOptions.info)) and 
-                        (not checkScript or getScript(value) == filterOptions.script)
+                        (not checkMatchUpvalues or areValuesInTable(upvalues, checkMatchUpvalues)) and 
+                        (not checkUpvalueAmount or #upvalues == checkUpvalueAmount) and 
+                        (not checkInfo or functionInfo == checkInfo) and 
+                        (not checkMatchInfo or areValuesInTable(functionInfo, checkMatchInfo)) and 
+                        (not checkScript or getScript(value) == checkScript)
                     end
 
                     local constants = getconstants(value);
                     local protos = getprotos(value);
 
-                    if checkConstants and constants ~= filterOptions.constants then return end
-                    if checkProtos and protos ~= filterOptions.protos then return end
+                    if checkConstants and constants ~= checkConstants then return end
+                    if checkProtos and protos ~= checkProtos then return end
 
-                    if checkMatchUpvalues and not areValuesInTable(upvalues, filterOptions.matchUpvalues) then return end
-                    if checkMatchConstants and not areValuesInTable(constants, filterOptions.matchConstants) then return end
-                    if checkMatchProtos and not areValuesInTable(protos, filterOptions.matchProtos) then return end
+                    if checkMatchUpvalues and not areValuesInTable(upvalues, checkMatchUpvalues) then return end
+                    if checkMatchConstants and not areValuesInTable(constants, checkMatchConstants) then return end
+                    if checkMatchProtos and not areValuesInTable(protos, checkMatchProtos) then return end
 
-                    if checkUpvalueAmount and #upvalues ~= filterOptions.upvalueAmount then return end
-                    if checkConstantAmount and #constants ~= filterOptions.constantAmount then return end
-                    if checkProtoAmount and #protos ~= filterOptions.protoAmount then return end
+                    if checkUpvalueAmount and #upvalues ~= checkUpvalueAmount then return end
+                    if checkConstantAmount and #constants ~= checkConstantAmount then return end
+                    if checkProtoAmount and #protos ~= checkProtoAmount then return end
 
-                    if checkInfo and functionInfo ~= filterOptions.info then return end
-                    if checkMatchInfo and not areValuesInTable(functionInfo, filterOptions.info) then return end
+                    if checkInfo and functionInfo ~= checkInfo then return end
+                    if checkMatchInfo and not areValuesInTable(functionInfo, checkMatchInfo) then return end
 
-                    if checkScript and getScript(value) ~= filterOptions.script then return end
+                    if checkScript and getScript(value) ~= checkScript then return end
 
                     return true;
                 end
@@ -372,9 +371,9 @@ do
 
             elseif filterOptions.type == "table" then
                 
-                local checkTableSize = checkIfType(filterOptions.tableSize, "number", "filterOptions.tableSize");
-                local checkMetatable = checkIfType(filterOptions.metatable, "table", "filterOptions.metatable");
-                local checkHasMetatable = checkIfType(filterOptions.hasMetatable, "boolean", "filterOptions.hasMetatable")
+                local checkTableSize = returnIfType(filterOptions.tableSize, "number", "filterOptions.tableSize");
+                local checkMetatable = returnIfType(filterOptions.metatable, "table", "filterOptions.metatable");
+                local checkHasMetatable = returnIfType(filterOptions.hasMetatable, "boolean", "filterOptions.hasMetatable")
                 
                 
                 local checkTableMatch = checkExists(filterOptions.tableMatch) 
@@ -396,12 +395,12 @@ do
 
                     if checkValue and value ~= filterOptions.value then return end
 
-                    if checkTableSize and #self.parent ~= filterOptions.tableSize then return end
+                    if checkTableSize and #self.parent ~= checkTableSize then return end
 
                     local metatable = getmetatable(value)
 
-                    if checkMetatable and metatable ~= filterOptions.metatable then return end
-                    if checkHasMetatable and metatable ~= filterOptions.hasMetatable then return end
+                    if checkMetatable and metatable ~= checkMetatable then return end
+                    if checkHasMetatable and metatable ~= checkHasMetatable then return end
 
                     if checkTableMatch then
 
@@ -433,15 +432,15 @@ do
 
             elseif filterOptions.type == "userdata" then
 
-                local checkMetatable = checkIfType(filterOptions.metatable, "table", "filterOptions.metatable");
-                local checkHasMetatable = checkIfType(filterOptions.hasMetatable, "boolean", "filterOptions.hasMetatable")
+                local checkMetatable = returnIfType(filterOptions.metatable, "table", "filterOptions.metatable");
+                local checkHasMetatable = returnIfType(filterOptions.hasMetatable, "boolean", "filterOptions.hasMetatable")
 
                 function ft:checkValue(value)
 
                     local metatable = getmetatable(value)
 
-                    if checkMetatable and metatable ~= filterOptions.metatable then return end
-                    if checkHasMetatable and not (filterOptions.hasMetatable and metatable or not filterOptions.hasMetatable and not metatable) then return end
+                    if checkMetatable and metatable ~= checkMetatable then return end
+                    if checkHasMetatable and checkHasMetatable == (metatable ~= nil) then return end
 
                     if checkValue and value ~= filterOptions.value then return end
 
@@ -460,18 +459,17 @@ do
 
             elseif not luaBaseTypes[filterOptions.type] then -- roblox types
 
-                local checkProperty = checkIfType(filterOptions.property, "string", "filterOptions.property");
-                local checkClassName = checkIfType(filterOptions.className, "string", "filterOptions.className");
+                local checkProperty = returnIfType(filterOptions.property, "string", "filterOptions.property");
+                local checkClassName = returnIfType(filterOptions.className, "string", "filterOptions.className");
 
                 function ft:checkValue(value)
-                    return not checkClassName or value.ClassName == filterOptions.className and (checkProperty and value[filterOptions.property] == filterOptions.value or not checkProperty and checkValue and filterOptions.value == value or not checkProperty and not checkValue)
+                    return not checkClassName or value.ClassName == checkClassName and (checkProperty and value[checkProperty] == filterOptions.value or not checkProperty and checkValue and filterOptions.value == value or not checkProperty and not checkValue)
                 end
 
                 function ft:writeMatch(index, value, path)
                     local match = self:createWeakTable();
                     match.Index = index;
-                    match.Value = filterOptions.value;
-                    match.Object = value
+                    match.Value = value;
                     match.Parent = self.parent;
                     if filterOptions.logPath then match.Path = path end
 
@@ -505,7 +503,7 @@ do
 
 
         ft.running = true;
-        ft:checkTable(target, logPath and ft:createPath({target}));
+        ft:checkTable(target, logPath and ft:createPath(ft:createWeakTable(target)));
 
 
         local signature = generateSignature();
@@ -523,7 +521,7 @@ do
             v.SearchId = signature;
         end
 
-        for i,v in pairs(ft.bag) do
+        for i,v in ipairs(ft.bag) do
             ft.bag[i] = nil
         end
 
@@ -535,39 +533,13 @@ do
 
                 nextScanFilterOptions = returnIfType(nextScanFilterOptions, "table", "#1")
 
-                local latestResults = ft.results;
+                local foundValues = ft:createWeakTable();
 
-                ft.running = true;
-
-                ft.results = ft:createWeakTable(); -- clean for new entries
-
-                ft.filteredTables = ft:createWeakTable()
-                ft.filteredFunctions = ft:createWeakTable()
-
-                filterOptions = nextScanFilterOptions;
-
-                loadTypes();
-
-                for i,v in ipairs(latestResults) do
-                    v = v.Value;
-                    if luaType(v) == filterOptions.type and (validator and filterOptions.validator(i,v) or not validator and self:checkValue(v)) then
-                        table.insert(ft.results, v)
-                    end
+                for i,v in ipairs(ft.results) do
+                    table.insert(foundValues, v.Value)
                 end
 
-                do -- gc and sig
-                    local results = ft.results; 
-
-                    for i,v in ipairs(results) do
-                        v.SearchId = signature;
-                    end
-
-                    for i,v in pairs(ft.bag) do
-                        ft.bag[i] = nil
-                    end
-                end
-
-                return setmetatable(ft.results, {__index = function(self, i) if i == "nextScan" then return nextScan elseif i == "display" then return display end end})
+                return filterTable(foundValues, nextScanFilterOptions);
             end
 
             display = function(limit) -- displays all (or limit) results found in console
